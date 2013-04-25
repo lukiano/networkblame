@@ -9,13 +9,15 @@ object ApplicationBuild extends Build {
 
   val appDependencies = Seq(
     // Add your project dependencies here,
-    jdbc,
-    anorm
+    //jdbc,
+    //anorm
+    "org.reactivemongo" %% "play2-reactivemongo" % "0.8"
   )
 
 
   val main = play.Project(appName, appVersion, appDependencies).settings(
-    // Add your own project settings here      
-  ).dependsOn(RootProject(file("slick-plugin/")))
+    // Add your own project settings here
+    scalaVersion := "2.10.1"
+  )
 
 }
