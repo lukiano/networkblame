@@ -2,66 +2,41 @@ package controllers
 
 import models.Ping
 import models.PingBSON._
-import reactivemongo.api.{Cursor, DB}
-import scala.concurrent.{Future, ExecutionContext}
 import akka.actor.Actor
-import reactivemongo.api.collections.default.BSONCollection
-import reactivemongo.core.commands.LastError
-import scala.util.{Failure, Success}
 import reactivemongo.bson.BSONDocument
-import play.api.Logger
+import controllers.PingActor._
+import akka.pattern.pipe
+import reactivemongo.core.commands.LastError
+import controllers.PingActor.Save
+import reactivemongo.api.collections.default.BSONCollection
+import controllers.PingActor.All
 
-sealed case class Save(ping: Ping)
+object PingActor {
+  sealed trait PingMessage
+  case class Save(ping: Ping) extends PingMessage
+  case class All() extends PingMessage
+  case class Query(query: BSONDocument) extends PingMessage
 
-sealed case class All()
+  case class ReturnMessage(success: Boolean, message: String)
+  object ReturnMessage {
+    def apply(t: Throwable):ReturnMessage = ReturnMessage(success = false, t.getMessage)
+    def apply(le: LastError):ReturnMessage = ReturnMessage(!le.inError, (if (le.inError) le.message else ""))
+  }
+}
 
-class PingActor(db: DB)(implicit ec: ExecutionContext) extends Actor {
+class PingActor(collection: BSONCollection) extends Actor {
+
+  import context.dispatcher
+
+  private val all = BSONDocument()
+  private def execute(query: BSONDocument) = collection.find(all).cursor[Ping].toList() recover {case _ => List()}
 
   def receive = {
-    case Save(ping) => {
-      Logger(this.getClass).info("Save received with Ping: " + ping)
-
-      val collection: BSONCollection = db("ping")
-      val future: Future[LastError] = collection.insert(ping)
-      val zender = sender
-      future.onComplete {
-        case Success(le: LastError) => {
-          Logger(this.getClass).info("Save success")
-          val body = "{'success': " + !le.inError + ", 'message': '" + (if (le.inError) le.message else "") + "'}"
-          zender ! body
-        }
-        case Failure(throwable) => {
-          Logger(this.getClass).error("Save failure", throwable)
-          val body = "{'success': false, 'message': '" + throwable.getMessage + "'}"
-          zender ! body
-        }
-      }
+    case pm: PingMessage => pm match {
+      case Save(ping) => collection.insert(ping) map(ReturnMessage.apply) recover {case t => ReturnMessage(t)} pipeTo sender
+      case All() => execute(all) pipeTo sender
+      case Query(query) => execute(query) pipeTo sender
     }
-
-    case All => {
-      Logger(this.getClass).info("All received")
-
-      val collection: BSONCollection = db("ping")
-
-      val cursor: Cursor[Ping] = collection.find(BSONDocument()).cursor[Ping]
-      val future: Future[List[Ping]] = cursor.toList()
-
-      val zender = sender
-
-      future.onComplete {
-        case Success(list: List[Ping]) => {
-          Logger(this.getClass).info("All success. Count: " + list.size)
-          zender ! list
-        }
-        case Failure(throwable) => {
-          Logger(this.getClass).error("All failure", throwable)
-        }
-      }
-
-      //cursor.enumerate()
-      //sender ! HttpResponse(entity = HttpBody(ContentType.`application/json`, body))
-    }
-
   }
 
 }
