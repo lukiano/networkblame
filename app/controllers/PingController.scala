@@ -27,32 +27,11 @@ object PingController extends Controller /* with MongoController */ {
   val db = ReactiveMongoPlugin.db
   lazy val collection: BSONCollection = db("ping")
 
-  val pingActor = Akka.system.actorOf(Props(new PingActor(db)))
-
-  def post = Action(parse.json) { request =>
-    Async {
-      val ping: Ping = Json.fromJson[Ping](request.body).get
-      Logger(this.getClass).info("Save received with Ping: " + ping)
-      collection.insert(ping).map( lastError => {
-        val message: String = lastError.errMsg.getOrElse("")
-        Ok(Json.obj( "success" -> !lastError.inError, "message" -> message))
-      })
-    }
-  }
-
-  def get = Action {
-    Async {
-      Logger(this.getClass).info("All received")
-      collection.find( BSONDocument() ).cursor[Ping].toList.map { pings =>
-        Ok(pings.foldLeft(JsArray(List()))( (obj, ping) => obj ++ Json.arr(ping) ))
-      }
-
-    }
-  }
+  val pingActor = Akka.system.actorOf(Props(() => new PingActor(db)))
 
   implicit val timeout = Timeout(90.seconds) // Akka timeout
 
-  def post2 = Action(parse.json) { request =>
+  def post = Action(parse.json) { request =>
     Async {
       val ping: Ping = Json.fromJson[Ping](request.body).get
       val future: Future[String] = (pingActor ? Save(ping)).mapTo[String]
@@ -60,7 +39,7 @@ object PingController extends Controller /* with MongoController */ {
     }
   }
 
-  def get2 = Action {
+  def get = Action {
     Async {
       val future: Future[List[Ping]] = (pingActor ? All).mapTo[List[Ping]]
       future.map( pings => Ok(pings.foldLeft(JsArray(List()))( (obj, ping) => obj ++ Json.arr(ping) )))

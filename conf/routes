@@ -10,6 +10,3 @@ GET     /assets/*file               controllers.Assets.at(path="/public", file)
 
 GET     /ping                       controllers.PingController.get
 POST    /ping                       controllers.PingController.post
-
-GET     /ping2                       controllers.PingController.get2
-POST    /ping2                       controllers.PingController.post2
