@@ -11,13 +11,13 @@ object ApplicationBuild extends Build {
     // Add your project dependencies here,
     //jdbc,
     //anorm
-    "org.reactivemongo" %% "play2-reactivemongo" % "0.8"
+    "org.reactivemongo" %% "play2-reactivemongo" % "0.9"
   )
 
 
   val main = play.Project(appName, appVersion, appDependencies).settings(
     // Add your own project settings here
-    scalaVersion := "2.10.1"
+    scalaVersion := "2.10.0"
   )
 
 }
